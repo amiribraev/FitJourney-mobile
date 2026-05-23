@@ -45,6 +45,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabIcon name="user" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="calorie-camera"
+        options={{
+          title: 'Калории',
+          tabBarIcon: ({ color }) => <TabIcon name="camera" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
