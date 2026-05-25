@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { AuthProvider } from '@/context/AuthContext';
 import { colors } from '@/constants/theme';
+import { I18nProvider } from '@/lib/i18n';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -42,13 +43,15 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={FitTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(app)" />
-        </Stack>
-      </ThemeProvider>
+      <I18nProvider>
+        <ThemeProvider value={FitTheme}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(app)" />
+          </Stack>
+        </ThemeProvider>
+      </I18nProvider>
     </AuthProvider>
   );
 }

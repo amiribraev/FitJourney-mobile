@@ -1,8 +1,13 @@
 import { auth } from './firebase';
 import type { DietPlan, Goal, Gender, WorkoutPlan } from './types';
+import type { UserProfile } from '@/lib/types';
+import type { Language } from '@/lib/i18n/types';
+import { generateLocalPlans } from '@/lib/services/localPlanGenerator';
+import { postValidateDietPlan, postValidateWorkoutPlan } from '@/lib/services/planPostValidation';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:9002';
 const REQUEST_TIMEOUT_MS = 20000;
+const MOJIBAKE_PATTERN = /(?:Ð|Ñ|PSC|(?:Р.|С.){3,})/;
 
 export type PlanGenerateInput = {
   age: number;
@@ -10,6 +15,16 @@ export type PlanGenerateInput = {
   weight: number;
   height: number;
   goal: Goal;
+  allergies?: string[];
+  intolerances?: string[];
+  dietRestriction?: string;
+  foodPreferences?: string[];
+  injuries?: string[];
+  loadRestrictions?: string[];
+  fitnessLevel?: string;
+  equipment?: string;
+  workoutGoals?: string[];
+  language?: Language;
   types?: ('diet' | 'workout')[];
 };
 
@@ -45,6 +60,18 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = REQU
   }
 }
 
+function hasMojibake(value: unknown): boolean {
+  if (typeof value === 'string') return MOJIBAKE_PATTERN.test(value);
+  if (Array.isArray(value)) return value.some((item) => hasMojibake(item));
+  if (value && typeof value === 'object') return Object.values(value as Record<string, unknown>).some((item) => hasMojibake(item));
+  return false;
+}
+
+function assertNoMojibake(plans: { dietPlan?: DietPlan; workoutPlan?: WorkoutPlan }) {
+  if (hasMojibake(plans.dietPlan) || hasMojibake(plans.workoutPlan)) {
+    throw new Error('PLAN_MOJIBAKE');
+  }
+}
 export async function generatePlans(input: PlanGenerateInput): Promise<{
   dietPlan?: DietPlan;
   workoutPlan?: WorkoutPlan;
@@ -93,4 +120,55 @@ export async function generatePlans(input: PlanGenerateInput): Promise<{
   }
 
   return response.json();
+}
+
+export async function generatePlansWithFallback(
+  profile: UserProfile,
+  preferLocal: boolean = false
+): Promise<{ dietPlan?: DietPlan; workoutPlan?: WorkoutPlan }> {
+  const input: PlanGenerateInput = {
+    age: profile.age,
+    gender: profile.gender,
+    weight: profile.weight,
+    height: profile.height,
+    goal: profile.goal,
+    allergies: profile.allergies,
+    intolerances: profile.intolerances,
+    dietRestriction: profile.dietRestriction,
+    foodPreferences: profile.foodPreferences,
+    injuries: profile.injuries,
+    loadRestrictions: profile.loadRestrictions,
+    fitnessLevel: profile.fitnessLevel,
+    equipment: profile.equipment,
+    workoutGoals: profile.workoutGoals,
+    language: profile.language,
+  };
+
+  if (preferLocal) {
+    const localPlans = generateLocalPlans(profile);
+    const result = {
+      dietPlan: postValidateDietPlan(localPlans.dietPlan, profile),
+      workoutPlan: postValidateWorkoutPlan(localPlans.workoutPlan, profile),
+    };
+    assertNoMojibake(result);
+    return result;
+  }
+
+  try {
+    const remotePlans = await generatePlans(input);
+    const result = {
+      dietPlan: postValidateDietPlan(remotePlans.dietPlan, profile),
+      workoutPlan: postValidateWorkoutPlan(remotePlans.workoutPlan, profile),
+    };
+    assertNoMojibake(result);
+    return result;
+  } catch {
+    const localPlans = generateLocalPlans(profile);
+    const result = {
+      dietPlan: postValidateDietPlan(localPlans.dietPlan, profile),
+      workoutPlan: postValidateWorkoutPlan(localPlans.workoutPlan, profile),
+    };
+    assertNoMojibake(result);
+    return result;
+  }
 }

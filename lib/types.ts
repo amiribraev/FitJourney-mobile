@@ -1,4 +1,5 @@
-export type Gender = 'male' | 'female';
+﻿export type Gender = 'male' | 'female';
+export type Language = 'kk' | 'ru' | 'en';
 export type Goal = 'weight loss' | 'muscle gain' | 'maintenance';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
 export type FitnessLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -17,9 +18,14 @@ export type UserProfile = {
   activityLevel: ActivityLevel;
   fitnessLevel: FitnessLevel;
   equipment: Equipment;
+  language: Language;
   dietRestriction: DietRestriction;
   allergies: string[];
+  intolerances: string[];
+  foodPreferences: string[];
   injuries: string[];
+  loadRestrictions: string[];
+  workoutGoals: string[];
   tdee: number;
   macros: { protein: number; fat: number; carbs: number };
   dietPlan?: DietPlan;
@@ -33,7 +39,7 @@ export type UserProfile = {
 };
 
 export type Meal = {
-  mealType: 'Завтрак' | 'Обед' | 'Ужин' | 'Перекус';
+  mealType: string;
   meal: string;
   calories: number;
   budget: number;
@@ -43,6 +49,7 @@ export type Meal = {
 
 export type DietPlan = {
   weeklyDietPlan: Record<string, Meal[]>;
+  generatedLanguage?: Language;
   generatedAt: string;
   tdeeUsed: number;
   macrosUsed: { protein: number; fat: number; carbs: number };
@@ -64,25 +71,42 @@ export type WorkoutDay = {
   estimatedDuration: number;
   exercises?: WorkoutExercise[];
   lightActivity?: string;
+  warmup?: string;
+  cooldown?: string;
 };
 
 export type WorkoutPlan = {
   weeklyWorkoutPlan: Record<string, WorkoutDay | string[]>;
+  generatedLanguage?: Language;
   generatedAt: string;
   equipment: Equipment;
   fitnessLevel: FitnessLevel;
 };
 
 export type ProgressLog = {
-  id: string;
-  userId: string;
-  date: string;
-  caloriesConsumed: number;
-  caloriesBurned: number;
-  workoutCompleted?: boolean;
-  workoutId?: string;
-  notes?: string;
+   id: string;
+   userId: string;
+   date: string;
+   caloriesConsumed: number;
+   totalCalories?: number;
+   breakfastCalories?: number;
+   lunchCalories?: number;
+   dinnerCalories?: number;
+   calorieInputMode?: 'total' | 'split';
+   calorieSources?: CalorieSourceEntry[];
+   caloriesBurned: number;
+   workoutCompleted?: boolean;
+   workoutId?: string;
+   notes?: string;
+   createdAt: string;
+   isHidden?: boolean;
+};
+
+export type CalorieSourceEntry = {
+  source: 'manual' | 'calorie-camera';
+  calories: number;
   createdAt: string;
+  note?: string;
 };
 
 export type BodyMeasurement = {
@@ -144,9 +168,9 @@ export const DAY_LABELS: Record<string, string> = {
 
 export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   sedentary: 'Сидячий образ жизни',
-  light: 'Лёгкая активность (1–3 дня/неделя)',
-  moderate: 'Умеренная активность (3–5 дней/неделя)',
-  active: 'Высокая активность (6–7 дней/неделя)',
+  light: 'Лёгкая активность (1-3 дня/неделя)',
+  moderate: 'Умеренная активность (3-5 дней/неделя)',
+  active: 'Высокая активность (6-7 дней/неделя)',
   'very-active': 'Очень высокая активность (2 раза/день)',
 };
 
@@ -171,3 +195,4 @@ export const DIET_LABELS: Record<DietRestriction, string> = {
   'gluten-free': 'Без глютена',
   'lactose-free': 'Без лактозы',
 };
+

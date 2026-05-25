@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+﻿import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
@@ -12,6 +12,7 @@ import type {
   Equipment,
   DietRestriction,
   GamificationStats,
+  Language,
 } from '@/lib/types';
 
 type AuthContextValue = {
@@ -33,7 +34,12 @@ type AuthContextValue = {
     equipment?: Equipment;
     dietRestriction?: DietRestriction;
     allergies?: string[];
+    intolerances?: string[];
+    foodPreferences?: string[];
     injuries?: string[];
+    loadRestrictions?: string[];
+    workoutGoals?: string[];
+    language?: Language;
   }) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfileData: (data: Partial<UserProfile>) => Promise<void>;
@@ -67,7 +73,7 @@ function getAuthErrorMessage(error: unknown): string {
     case 'auth/weak-password':
       return 'Пароль должен содержать минимум 6 символов';
     case 'auth/invalid-credential':
-      return 'Неверные учётные данные';
+      return 'Неверные учетные данные';
     case 'auth/network-request-failed':
       return 'Ошибка сети. Проверьте подключение к интернету';
     case 'auth/too-many-requests':
@@ -88,7 +94,33 @@ const DEFAULT_GAMIFICATION: GamificationStats = {
   achievements: [],
 };
 
+function sanitizeForFirestore<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item)) as T;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [k, sanitizeForFirestore(v)]);
+    return Object.fromEntries(entries) as T;
+  }
+  return value;
+}
+
 function getInitialProfile(user: firebase.User, data: any): UserProfile {
+  const normalizeArray = (val: any): string[] => {
+    if (Array.isArray(val)) return val;
+    if (val && typeof val === 'object') {
+      const keys = Object.keys(val);
+      if (keys.length > 0 && keys.every(k => !isNaN(Number(k)))) {
+        return Object.values(val);
+      }
+    }
+    return [];
+  };
+  
   return {
     uid: user.uid,
     email: user.email ?? '',
@@ -102,8 +134,13 @@ function getInitialProfile(user: firebase.User, data: any): UserProfile {
     fitnessLevel: data?.fitnessLevel ?? 'beginner',
     equipment: data?.equipment ?? 'no-equipment',
     dietRestriction: data?.dietRestriction ?? 'none',
-    allergies: data?.allergies ?? [],
-    injuries: data?.injuries ?? [],
+    allergies: normalizeArray(data?.allergies),
+    intolerances: normalizeArray(data?.intolerances),
+    foodPreferences: normalizeArray(data?.foodPreferences),
+    injuries: normalizeArray(data?.injuries),
+    loadRestrictions: normalizeArray(data?.loadRestrictions),
+    workoutGoals: normalizeArray(data?.workoutGoals),
+    language: data?.language ?? 'ru',
     tdee: data?.tdee ?? 0,
     macros: data?.macros ?? { protein: 0, fat: 0, carbs: 0 },
     dietPlan: data?.dietPlan,
@@ -176,7 +213,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     equipment?: Equipment;
     dietRestriction?: DietRestriction;
     allergies?: string[];
+    intolerances?: string[];
+    foodPreferences?: string[];
     injuries?: string[];
+    loadRestrictions?: string[];
+    workoutGoals?: string[];
+    language?: Language;
   }) => {
     const cred = await firebase.auth().createUserWithEmailAndPassword(data.email, data.password);
     const createdUser = requireCredentialUser(cred);
@@ -197,7 +239,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       equipment: data.equipment ?? 'no-equipment',
       dietRestriction: data.dietRestriction ?? 'none',
       allergies: data.allergies ?? [],
+      intolerances: data.intolerances ?? [],
+      foodPreferences: data.foodPreferences ?? [],
       injuries: data.injuries ?? [],
+      loadRestrictions: data.loadRestrictions ?? [],
+      workoutGoals: data.workoutGoals ?? [],
+      language: data.language ?? 'ru',
       tdee: 0,
       macros: { protein: 0, fat: 0, carbs: 0 },
       progressLogs: [],
@@ -215,19 +262,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfileData = async (data: Partial<UserProfile>) => {
     if (!user) return;
-    await firebase.firestore().collection('users').doc(user.uid).update({
+    const payload = sanitizeForFirestore({
       ...data,
       updatedAt: new Date().toISOString(),
     });
+    await firebase.firestore().collection('users').doc(user.uid).update(payload);
   };
 
   const updateGamification = async (data: Partial<GamificationStats>) => {
     if (!user || !profile) return;
     const updated = { ...profile.gamification, ...data };
-    await firebase.firestore().collection('users').doc(user.uid).update({
+    const payload = sanitizeForFirestore({
       gamification: updated,
       updatedAt: new Date().toISOString(),
     });
+    await firebase.firestore().collection('users').doc(user.uid).update(payload);
   };
 
   const refreshProfile = () => setProfileTick((n) => n + 1);
@@ -280,7 +329,12 @@ export async function signUpWithErrorAlert(data: {
   equipment?: Equipment;
   dietRestriction?: DietRestriction;
   allergies?: string[];
+  intolerances?: string[];
+  foodPreferences?: string[];
   injuries?: string[];
+  loadRestrictions?: string[];
+  workoutGoals?: string[];
+  language?: Language;
 }) {
   try {
     const cred = await firebase.auth().createUserWithEmailAndPassword(data.email, data.password);
@@ -301,7 +355,12 @@ export async function signUpWithErrorAlert(data: {
       equipment: data.equipment ?? 'no-equipment',
       dietRestriction: data.dietRestriction ?? 'none',
       allergies: data.allergies ?? [],
+      intolerances: data.intolerances ?? [],
+      foodPreferences: data.foodPreferences ?? [],
       injuries: data.injuries ?? [],
+      loadRestrictions: data.loadRestrictions ?? [],
+      workoutGoals: data.workoutGoals ?? [],
+      language: data.language ?? 'ru',
       tdee: 0,
       macros: { protein: 0, fat: 0, carbs: 0 },
       progressLogs: [],
@@ -317,3 +376,4 @@ export async function signUpWithErrorAlert(data: {
     throw e;
   }
 }
+
